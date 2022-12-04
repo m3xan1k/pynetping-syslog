@@ -1,22 +1,11 @@
 from datetime import datetime
-import os
 import socketserver
 import typing
 
 import psycopg
 from psycopg.types.json import Json
 
-
-HOST = '0.0.0.0'
-# fail fast
-SERVER_PORT = int(os.environ.get('SERVER_PORT', 514))
-
-PGHOST = os.environ.get('PGHOST', 'localhost')
-PGPORT = os.environ.get('PGPORT', 5432)
-PGBASE = os.environ.get('PGBASE', 'syslog_events')
-# fail fast
-PGUSER = os.environ['PGUSER']
-PGPASSWORD = os.environ['PGPASSWORD']
+import settings
 
 
 class ThreadingUDPServer(
@@ -62,14 +51,7 @@ class SyslogHandler(socketserver.BaseRequestHandler):
 
     @staticmethod
     def write_details(details: dict) -> None:
-        connection_string = 'postgresql://{}:{}@{}:{}/{}?sslmode=disable'.format(  # noqa
-            PGUSER,
-            PGPASSWORD,
-            PGHOST,
-            PGPORT,
-            PGBASE,
-        )
-        with psycopg.connect(connection_string) as conn:
+        with psycopg.connect(settings.CONN_STRING) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -91,5 +73,8 @@ class SyslogHandler(socketserver.BaseRequestHandler):
 
 
 if __name__ == '__main__':
-    with ThreadingUDPServer((HOST, SERVER_PORT), SyslogHandler) as server:
+    with ThreadingUDPServer(
+        (settings.HOST, settings.SERVER_PORT),
+        SyslogHandler,
+    ) as server:
         server.serve_forever()
