@@ -1,6 +1,8 @@
 from base64 import b64encode
 import json
 import http.client as client
+import logging
+import socket
 import typing
 
 import psycopg
@@ -40,7 +42,9 @@ def basic_auth(user: str, password: str) -> str:
     return 'Basic {}'.format(token)
 
 
-def send(data: typing.List[dict]) -> client.HTTPResponse:
+def send(
+    data: typing.List[dict]
+) -> typing.Optional[client.HTTPResponse]:
     headers = {
         'content-type': 'application/json',
         'authorization': basic_auth(
@@ -49,15 +53,25 @@ def send(data: typing.List[dict]) -> client.HTTPResponse:
         )
     }
     payload = json.dumps(data, ensure_ascii=False).encode('utf-8')
-    conn = client.HTTPConnection(settings.API_HOST, settings.API_PORT)
-    conn.request(
-        'POST',
-        settings.API_URI,
-        body=payload,
-        headers=headers
-    )
-    response = conn.getresponse()
-    return response
+    try:
+        conn = client.HTTPConnection(
+            settings.API_HOST,
+            settings.API_PORT,
+            timeout=10,
+        )
+    except socket.timeout as err:
+        logging.error(err)
+    except client.HTTPException as err:
+        logging.error(err)
+    else:
+        conn.request(
+            'POST',
+            settings.API_URI,
+            body=payload,
+            headers=headers
+        )
+        response = conn.getresponse()
+        return response
 
 
 if __name__ == '__main__':
@@ -66,6 +80,6 @@ if __name__ == '__main__':
             {'uid': str(record[0]), 'details': record[1]}
             for record in records
         ]
-        response = send(records_dicts)
-        if response.status in [200, 201]:
-            syncronize_records(records)
+        if response := send(records_dicts):
+            if response.status in [200, 201]:
+                syncronize_records(records)
