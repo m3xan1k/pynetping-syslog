@@ -1,11 +1,13 @@
 from datetime import datetime
 import socketserver
 import typing
+import logging
 
 import psycopg
 from psycopg.types.json import Json
 
-import settings
+from common import settings
+from common import constants
 
 
 class ThreadingUDPServer(
@@ -21,6 +23,7 @@ class SyslogHandler(socketserver.BaseRequestHandler):
         datagram: str = self.request[0].strip().decode('utf-8')
         splitted_datagram = datagram.split(' ')
         details = self.parse_details(splitted_datagram)
+        self.validate(details)
         self.write_details(details)
 
     def parse_details(self, splitted_datagram: typing.List[str]) -> dict:
@@ -34,18 +37,18 @@ class SyslogHandler(socketserver.BaseRequestHandler):
                 "name": "IO4"
                 "value": "0"
             },
-            "verbose_message": "some message",
+            "event_type": "some message",
             "dt": "2022-11-29T18:58:34.089000"
         }
         """
         dt = self.parse_dt(splitted_datagram[:3])
         sensor_name = splitted_datagram[3]
         io_port_name, io_port_value = splitted_datagram[5].split('=')
-        verbose_message = ' '.join(splitted_datagram[6:])
+        event_type = ' '.join(splitted_datagram[6:])
         return {
             'sensor': {'name': sensor_name},
             'io_port': {'name': io_port_name, 'value': io_port_value},
-            'verbose_message': verbose_message,
+            'event_type': event_type,
             'dt': dt,
         }
 
@@ -55,9 +58,9 @@ class SyslogHandler(socketserver.BaseRequestHandler):
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    INSERT INTO events(details) VALUES (%s)
+                    INSERT INTO events(type, details) VALUES (%s, %s)
                     """,
-                    [Json(details)]
+                    (details.pop('event_type'), Json(details))
                 )
 
     @staticmethod
@@ -70,6 +73,11 @@ class SyslogHandler(socketserver.BaseRequestHandler):
         year = datetime.now().year
         date_string = '{} {}'.format(year, ' '.join(data))
         return datetime.strptime(date_string, dt_format).isoformat()
+
+    @staticmethod
+    def validate(data: dict) -> None:
+        if data['event_type'] not in constants.EventType:
+            logging.warning('Event type value is incorrect')
 
 
 if __name__ == '__main__':
