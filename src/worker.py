@@ -7,7 +7,7 @@ import typing
 
 import psycopg
 
-import settings
+from common import settings
 
 
 def fetch_records() -> typing.Optional[typing.List[tuple]]:
