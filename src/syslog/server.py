@@ -28,7 +28,7 @@ class SyslogHandler(socketserver.BaseRequestHandler):
 
     def parse_details(self, splitted_datagram: typing.List[str]) -> dict:
         """
-        input: Nov 29 18:58:34.089 OST10-NP1 NetPing: IO4=0 some message
+        input: Nov 29 18:58:34.089 OST10-NP1 NetPing: IO4=0 enter
         output: {
             "sensor": {
                 "name": "OST10-NP1"
@@ -37,7 +37,7 @@ class SyslogHandler(socketserver.BaseRequestHandler):
                 "name": "IO4"
                 "value": "0"
             },
-            "event_type": "some message",
+            "event_type": "enter" (or "leave"),
             "dt": "2022-11-29T18:58:34.089000"
         }
         """
